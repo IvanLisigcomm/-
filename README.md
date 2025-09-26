@@ -3,8 +3,8 @@
 一个纯前端静态网页，模拟“滚仓复利”策略：价格每上涨到设定阈值（如 10%）时，将当前全部浮盈用于开新仓，形成复利滚动。
 
 ## 使用
-# 在线访问<https://ivanlisigcomm.github.io/-/>
-# 下载后直接用浏览器打开 `index.html`。
+### 在线访问<https://ivanlisigcomm.github.io/-/>
+### 本地下载后直接用浏览器打开 `index.html`。
 <img width="1650" height="6138" alt="image" src="https://github.com/user-attachments/assets/288ef43a-b471-43d5-b921-cea32ef62f3d" />
 
 ## 输入参数
