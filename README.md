@@ -5,6 +5,7 @@
 ## 使用
 
 直接用浏览器打开 `index.html`。
+<img width="1650" height="6138" alt="image" src="https://github.com/user-attachments/assets/288ef43a-b471-43d5-b921-cea32ef62f3d" />
 
 ## 输入参数
 
