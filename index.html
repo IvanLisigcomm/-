@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>永续合约滚仓收益计算器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+    <meta name="description" content="币圈永续合约滚仓收益计算器：本金在每次价格上涨达到阈值后将浮盈全部用于加仓，模拟复利滚动收益并可视化。">
+  </head>
+  <body>
+    <header class="container">
+      <h1>永续合约滚仓收益计算器</h1>
+      <p class="subtitle">示例：本金 100 USDT，10× 杠杆，价格每涨 10% 将当期浮盈全部用于加仓（平仓并立即满仓重开），计算滚动复利后的收益与曲线。</p>
+    </header>
+
+    <main class="container grid">
+      <section class="card">
+        <h2>参数设置</h2>
+        <div class="preset-templates">
+          <label>快速模板：</label>
+          <div class="template-buttons">
+            <button type="button" class="template-btn" data-template="conservative">保守型</button>
+            <button type="button" class="template-btn" data-template="moderate">平衡型</button>
+            <button type="button" class="template-btn" data-template="aggressive">激进型</button>
+          </div>
+        </div>
+        <form id="simForm">
+          <div id="formErrors" class="form-errors" aria-live="polite" style="display:none"></div>
+          <div class="form-row">
+            <label for="initialCapital">
+              初始本金 (USDT)
+              <span class="tooltip" data-tooltip="用于开仓的初始资金，建议不超过总资金的20%">ℹ️</span>
+            </label>
+            <input id="initialCapital" name="initialCapital" type="number" inputmode="decimal" step="0.01" min="1" value="100">
+          </div>
+          <div class="form-row">
+            <label for="leverage">
+              杠杆倍数 (×)
+              <span class="tooltip" data-tooltip="杠杆越高收益越大但风险也越高，新手建议不超过10倍">ℹ️</span>
+            </label>
+            <input id="leverage" name="leverage" type="number" inputmode="decimal" step="0.1" min="1" value="10">
+          </div>
+          <div class="form-row">
+            <label for="entryPrice">
+              入场价格 (USDT)
+              <span class="tooltip" data-tooltip="第一次开仓时的价格，作为价格上涨的基准">ℹ️</span>
+            </label>
+            <input id="entryPrice" name="entryPrice" type="number" inputmode="decimal" step="0.0001" min="0.0001" value="100">
+          </div>
+          <div class="form-row">
+            <label for="stepPct">
+              每次加仓阈值 (%)
+              <span class="tooltip" data-tooltip="价格每上涨这个百分比就进行一次滚仓操作，阈值越小频率越高">ℹ️</span>
+            </label>
+            <input id="stepPct" name="stepPct" type="number" inputmode="decimal" step="0.1" min="0.1" value="10">
+          </div>
+          <div class="form-row">
+            <label for="steps">
+              加仓次数 (步数)
+              <span class="tooltip" data-tooltip="总共进行多少次滚仓操作，次数越多最终价格越高">ℹ️</span>
+            </label>
+            <input id="steps" name="steps" type="number" inputmode="numeric" step="1" min="1" value="10">
+          </div>
+
+          <details class="advanced">
+            <summary>高级设置</summary>
+            <div class="form-row">
+              <label for="takerFee">Taker 手续费率 (单边, 如 0.0006)</label>
+              <input id="takerFee" name="takerFee" type="number" inputmode="decimal" step="0.0001" min="0" value="0.0006">
+            </div>
+            <div class="form-row">
+              <label for="fundingPerStep">每步资金费率 (按名义价值, 如 0 表示忽略)</label>
+              <input id="fundingPerStep" name="fundingPerStep" type="number" inputmode="decimal" step="0.0001" min="0" value="0">
+            </div>
+            <div class="form-row">
+              <label for="mmr">维持保证金率 MMR (用于估算强平, 如 0.004)</label>
+              <input id="mmr" name="mmr" type="number" inputmode="decimal" step="0.0001" min="0" value="0.004">
+            </div>
+            <div class="form-row checkbox">
+              <input id="closeAtEnd" name="closeAtEnd" type="checkbox" checked>
+              <label for="closeAtEnd">模拟结束时平掉最终仓位（计入一次平仓手续费）</label>
+            </div>
+          </details>
+
+          <div class="actions">
+            <button type="submit" class="primary">计算</button>
+            <button type="button" id="resetBtn" class="ghost">重置</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>结果与图表</h2>
+        <div class="chart-controls">
+          <label class="ctrl">
+            <input type="checkbox" id="toggleLog">
+            对数坐标
+          </label>
+          <label class="ctrl">
+            <input type="checkbox" id="toggleMarkers">
+            标记滚仓点
+          </label>
+          <div class="spacer"></div>
+          <button id="exportChart" type="button" class="ghost">导出图表</button>
+          <button id="shareLink" type="button" class="ghost">分享链接</button>
+        </div>
+        <div class="kpis" id="kpis">
+          <div class="kpi"><div class="kpi-label">最终权益</div><div class="kpi-value" id="kpiFinalEquity">-</div></div>
+          <div class="kpi"><div class="kpi-label">总收益率</div><div class="kpi-value" id="kpiRoi">-</div></div>
+          <div class="kpi"><div class="kpi-label">总手续费</div><div class="kpi-value" id="kpiFees">-</div></div>
+          <div class="kpi"><div class="kpi-label">加仓次数</div><div class="kpi-value" id="kpiSteps">-</div></div>
+          <div class="kpi"><div class="kpi-label">最小距强平</div><div class="kpi-value" id="kpiMinDist">-</div></div>
+          <div class="kpi"><div class="kpi-label">最近强平价</div><div class="kpi-value" id="kpiMinLiq">-</div></div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="equityChart"></canvas>
+        </div>
+        <div class="chart-wrap chart-wrap--roi">
+          <canvas id="roiChart"></canvas>
+        </div>
+      </section>
+
+      <section class="card wide">
+        <div class="table-actions">
+          <h2>逐步计算明细</h2>
+          <button id="downloadCsv" type="button">导出 CSV</button>
+          <button id="downloadJson" type="button" class="ghost">导出 JSON</button>
+        </div>
+        <div class="table-wrap">
+          <div class="mobile-table-hint" style="display: none;">👈 左右滑动查看更多数据</div>
+          <table id="resultTable">
+            <thead>
+              <tr>
+                <th>步</th>
+                <th>价格</th>
+                <th>强平价</th>
+                <th>距强平</th>
+                <th>加仓进场价</th>
+                <th>开仓名义</th>
+                <th>持仓数量</th>
+                <th>本步PnL</th>
+                <th>手续费(平/开)</th>
+                <th>资金费</th>
+                <th>期末权益</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card wide">
+        <h2>敏感性分析</h2>
+        <div class="sensitivity-analysis" style="display: none;">
+          <div class="sensitivity-controls">
+            <label>
+              <input type="checkbox" id="enableSensitivity">
+              启用敏感性分析
+            </label>
+            <div class="sensitivity-params" style="display: none;">
+              <label>分析参数：
+                <select id="sensitivityParam">
+                  <option value="leverage">杠杆倍数</option>
+                  <option value="stepPct">加仓阈值</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="sensitivity-chart-wrap" style="display: none;">
+            <canvas id="sensitivityChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="card wide">
+        <h2>计算说明</h2>
+        <details open>
+          <summary>展开/折叠 公式与假设</summary>
+          <div class="prose">
+            <p>假设使用 USDT 线性永续，多头方向。每当价格自上一次“开仓价”上涨 <code>s%</code> 即进行一次“滚仓”：<strong>先全部平仓、再用当下全部权益按杠杆 <code>L</code> 满仓重开</strong>。每次平/开收取 <code>t</code> 的单边 Taker 手续费（按名义价值计）。可选每步资金费率 <code>f</code>（按名义价值计）。</p>
+            <ul>
+              <li><strong>价格轨迹</strong>：<code>P_k = P_0 * (1 + s)^k</code></li>
+              <li><strong>第 k 步开仓名义</strong>：<code>N_k = L * E_{k-1}</code></li>
+              <li><strong>第 k 步持仓数量</strong>：<code>Q_k = N_k / P_{k-1}</code></li>
+              <li><strong>本步盈亏</strong>：<code>PNL_k = Q_k * (P_k - P_{k-1})</code></li>
+              <li><strong>手续费</strong>：平仓 <code>fee^close_k = t * (P_k * Q_k)</code>；重开 <code>fee^open_{k+1} = t * (L * E_k')</code>，其中 <code>E_k' = E_{k-1} + PNL_k - fee^close_k - funding_k</code></li>
+              <li><strong>资金费</strong>（可选）：<code>funding_k = f * N_k</code></li>
+              <li><strong>期末权益</strong>：<code>E_k = E_k' - fee^open_{k+1}</code>（若为最后一步且勾选“模拟结束时平仓”，再扣一次平仓手续费）</li>
+              <li><strong>强平参考</strong>（近似）：<code>P_{liq} \approx P_{entry} * (1 - 1/L + MMR)</code></li>
+            </ul>
+            <p>以上为理想化模型，忽略滑点、资金费方向变化、维持保证金分层、强平缓冲等交易所细节，仅用于教育和策略粗评估。</p>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <footer class="container footer">
+      <div>© 2025 滚仓收益计算器 · 仅供学习研究，不构成投资建议</div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+  </html>
+
+
